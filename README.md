@@ -47,15 +47,48 @@
 
 ## Tool Inventory
 
-<!-- Four lines per tool. This is worth 2 points and it's the single most
-     common place students lose them.
+## Tool Inventory
 
-     "Returns a list" earns NOTHING. The description has to say what is IN
-     the list.
+### 1. search_listings(description, size, max_price)
 
-     The empty case isn't optional either — it's the thing your loop branches
-     on, and if you don't decide it here you'll discover it as a crash in
-     Milestone 5. -->
+- **What it does:** Searches the thrift listings dataset for clothing matching the user's description, requested size, and budget.
+- **Inputs:** `description` (str) contains the search keywords, `size` (str | None) is the requested size or None if no size is specified, and `max_price` (float | None) is the maximum price or None if there is no budget limit.
+- **Returns:** A list of matching listing dictionaries, sorted by relevance from highest to lowest, limited to `config.SEARCH_RESULT_LIMIT` results. Each dictionary contains `id`, `title`, `description`, `category`, `style_tags`, `size`, `condition`, `price`, `colors`, `brand`, and `platform`. The `brand` field may be None.
+- **Empty case:** Returns an empty list `[]` if no listings match.
+
+**Matching rules:**
+
+A listing must match at least one meaningful keyword from the description in its title, description, category, style tags, colors, or brand to be included. Listings with no keyword matches are excluded, even if their size and price match.
+
+Size matching is case-insensitive. Combined sizes such as S/M can match M, but L does not automatically match XL. Numeric jeans sizes such as W30 L30 do not match letter sizes such as M. The maximum price is inclusive, meaning an item costing exactly $30 qualifies for a $30 maximum.
+
+### 2. suggest_outfit(new_item, wardrobe)
+
+- **What it does:** Uses AI to suggest one or two outfits combining a thrifted item with clothing the user already owns.
+- **Inputs:** `new_item` (dict) contains the selected listing, and `wardrobe` (dict) contains an `items` key holding a list of wardrobe-item dictionaries.
+- **Returns:** A non-empty string containing outfit suggestions that reference specific pieces from the user's wardrobe.
+- **Empty case:** If `wardrobe["items"]` is empty, returns general styling suggestions for the thrifted item instead of failing.
+
+If the model API call fails, the tool raises an exception so the planning loop can record an error message and stop.
+
+### 3. create_fit_card(outfit, new_item)
+
+- **What it does:** Uses AI to generate a short, natural social media caption describing the thrifted item and outfit.
+- **Inputs:** `outfit` (str) contains the outfit suggestions from `suggest_outfit()`, and `new_item` (dict) contains the selected clothing listing.
+- **Returns:** A string containing a two-to-four-sentence caption mentioning the clothing item, its price, the selling platform, and the outfit's style.
+- **Empty case:** Returns an empty string `""` if the outfit is empty or contains only whitespace.
+
+If the model API call fails, the tool raises an exception so the planning loop can record an error message and stop.
+
+### Planning Loop Branch Rule
+
+If `search_listings()` returns an empty list, the agent saves a message in session state explaining that no matching items were found, such as "No listings matched 'vintage graphic tee' in size M under $30." The agent displays this message to the user and stops without calling the other tools.
+
+Otherwise, the agent selects the first matching listing, saves it in session state, and passes it automatically to `suggest_outfit()` along with the user's wardrobe.
+
+The outfit suggestion is saved in session state and passed to `create_fit_card()` along with the selected listing. The resulting caption is saved and returned to the user.
+
+If either AI tool raises an exception, the agent records an error message in session state and stops rather than continuing with incomplete information.
 
 ### `search_listings`
 
